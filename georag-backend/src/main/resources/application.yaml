@@ -1,3 +1,64 @@
 spring:
   application:
     name: GeoRAG
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    # 你的数据库地址 (默认端口 5432)
+    url: jdbc:postgresql://localhost:5432/georag_db?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: postgres
+    password: your_password
+    # 选填：Hikari 连接池配置 (生产环境建议配置)
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  data:
+    redis:
+      # Redis 服务器地址
+      host: localhost
+      port: 6379
+      password: your_redis_password # 没有密码就留空
+      database: 0 # 默认使用 0 号库
+      # 选填：连接超时设置
+      timeout: 3000ms
+      # 选填：Lettuce 连接池配置
+      lettuce:
+        pool:
+          max-active: 8   # 最大连接数
+          max-wait: -1ms  # 最大阻塞等待时间
+          max-idle: 8     # 最大空闲连接
+          min-idle: 0     # 最小空闲连接
+
+mybatis-plus:
+  # 打印 SQL 语句 (开发环境开启，生产环境建议关闭)
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  # 实体类扫描包 (对应你的 entity 目录)
+  type-aliases-package: com.EarthCube.georag_backend.entity
+  # Mapper XML 文件位置 (如果你后期需要写复杂 SQL XML)
+  mapper-locations: classpath:mapper/*.xml
+  global-config:
+    db-config:
+      # 逻辑删除字段值 (0-未删除, 1-已删除) - 对应你的 status=3 业务逻辑可能需要适配
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+minio:
+  endpoint: http://你的minio地址:9000
+  access-key: 你的账号
+  secret-key: 你的密码
+  bucket-name: avatar # 专门存头像的桶
+
+jwt:
+  # 必须足够复杂，建议使用 UUID 生成
+  secret: EarthCube_GeoRag_Backend_Secret_Key_For_2026_Project_Security
+  # 7天 = 604800000 毫秒
+  expiration: 604800000
+  token-header: Authorization
+  token-head: "Bearer "
+
+spring.servlet.multipart:
+  max-file-size: 5MB
+  max-request-size: 10MB
