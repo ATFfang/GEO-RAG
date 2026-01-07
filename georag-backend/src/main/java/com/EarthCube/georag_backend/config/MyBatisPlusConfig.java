@@ -1,24 +1,25 @@
 package com.EarthCube.georag_backend.config;
 
-import com.baomidou.mybatisplus.annotation.DbType;
-import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
-import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+import javax.sql.DataSource;
 
 @Configuration
-@EnableTransactionManagement
 public class MyBatisPlusConfig {
 
-    /**
-     * 添加分页插件
-     */
     @Bean
-    public MybatisPlusInterceptor mybatisPlusInterceptor() {
-        MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
-        // 如果是 MySQL 就选 MYSQL，PostgreSQL 就选 POSTGRE_SQL
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.POSTGRE_SQL));
-        return interceptor;
+    public SqlSessionFactory sqlSessionFactory(DataSource dataSource) throws Exception {
+        // 注意：这里必须用 MybatisSqlSessionFactoryBean 而不是原生的 SqlSessionFactoryBean
+        MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+
+        // 如果你有 XML 映射文件，取消下面这行的注释
+        // factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:mapper/*.xml"));
+
+        return factoryBean.getObject();
     }
 }

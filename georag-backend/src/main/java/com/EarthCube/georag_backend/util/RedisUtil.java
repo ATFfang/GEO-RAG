@@ -1,51 +1,58 @@
 package com.EarthCube.georag_backend.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.Resource;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+
 import java.util.concurrent.TimeUnit;
 
 @Component
 public class RedisUtil {
 
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Resource
-    private ObjectMapper objectMapper; // Spring Boot 默认自动配置好的
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     /**
-     * 设置缓存（手动转JSON）
+     * 普通缓存获取
      */
-    public void set(String key, Object value, long time, TimeUnit timeUnit) {
+    public Object get(String key) {
+        return key == null ? null : redisTemplate.opsForValue().get(key);
+    }
+
+    /**
+     * 普通缓存放入并设置时间
+     * @param time 时间(秒) time > 0 若 time <= 0 将设置无限期
+     */
+    public boolean set(String key, Object value, long time) {
         try {
-            String jsonValue = objectMapper.writeValueAsString(value);
-            stringRedisTemplate.opsForValue().set(key, jsonValue, time, timeUnit);
+            if (time > 0) {
+                redisTemplate.opsForValue().set(key, value, time, TimeUnit.SECONDS);
+            } else {
+                redisTemplate.opsForValue().set(key, value);
+            }
+            return true;
         } catch (Exception e) {
-            throw new RuntimeException("Redis序列化失败", e);
+            e.printStackTrace();
+            return false;
         }
     }
 
     /**
-     * 获取缓存（手动转回对象）
+     * 判断 key 是否存在
      */
-    public <T> T get(String key, Class<T> clazz) {
-        String jsonValue = stringRedisTemplate.opsForValue().get(key);
-        if (jsonValue == null) return null;
-        try {
-            return objectMapper.readValue(jsonValue, clazz);
-        } catch (Exception e) {
-            throw new RuntimeException("Redis反序列化失败", e);
-        }
-    }
-
-    // 基础操作不需要序列化
     public boolean hasKey(String key) {
-        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
-    public void del(String key) {
-        stringRedisTemplate.delete(key);
+    /**
+     * 获取过期时间
+     */
+    public long getExpire(String key) {
+        return redisTemplate.getExpire(key, TimeUnit.SECONDS);
     }
 }

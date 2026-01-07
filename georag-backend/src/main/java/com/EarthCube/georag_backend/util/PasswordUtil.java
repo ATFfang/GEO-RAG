@@ -1,11 +1,13 @@
 package com.EarthCube.georag_backend.util;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Component;
 
 /**
  * 密码加密工具类
  * 依赖：spring-boot-starter-security 或 spring-security-crypto
  */
+@Component
 public class PasswordUtil {
 
     // BCryptPasswordEncoder 自带盐值生成，安全性极高
