@@ -25,7 +25,7 @@ public class EmailUtil {
      * @param subject 主题
      * @param content 内容
      */
-    public void sendTextEmail(String to, String subject, String content) {
+    public void send(String to, String subject, String content) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);

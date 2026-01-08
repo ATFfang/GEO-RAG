@@ -36,7 +36,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     private JwtUtil jwtUtil;
     @Autowired
     private MinioUtil minioUtil;
-    // @Autowired private EmailUtil emailUtil; // 暂时注释，你需要补全EmailUtil
+    @Autowired
+    private EmailUtil emailUtil;
 
     @Override
     public void sendRegisterCode(SendRegisterCodeDTO dto) {
@@ -65,7 +66,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 5. 发送邮件 (这里先打印到控制台模拟)
         log.info("【模拟邮件发送】向 {} 发送验证码: {}", email, code);
-        // emailUtil.send(email, "注册验证码", "您的验证码是：" + code);
+        emailUtil.send(email, "注册验证码", "您的验证码是：" + code);
     }
 
     @Override
@@ -215,7 +216,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         SysUser user = this.getById(userId);
 
         // 1. 二次校验密码
-        if (!PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
+        if (PasswordUtil.matches(dto.getPassword(), user.getPassword())) {
             throw new BusinessException("密码错误，注销失败");
         }
 

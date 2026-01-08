@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* 在这里直接定义 Gemini 风格的主题变量 */
+@theme {
+  --color-gemini-dark: #0f172a;
+  --color-gemini-primary: #3b82f6;
+  --color-gemini-accent: #8b5cf6;
+  --color-gemini-surface: rgba(255, 255, 255, 0.05);
+  
+  --animate-fade-in: fadeIn 0.5s ease-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-gemini-dark);
+  color: white;
+  overflow: hidden;
+}

@@ -21,19 +21,18 @@ public class RedisUtil {
 
     /**
      * 普通缓存放入并设置时间
+     *
      * @param time 时间(秒) time > 0 若 time <= 0 将设置无限期
      */
-    public boolean set(String key, Object value, long time) {
+    public void set(String key, Object value, long time) {
         try {
             if (time > 0) {
                 redisTemplate.opsForValue().set(key, value, time, TimeUnit.SECONDS);
             } else {
                 redisTemplate.opsForValue().set(key, value);
             }
-            return true;
         } catch (Exception e) {
             e.printStackTrace();
-            return false;
         }
     }
 
