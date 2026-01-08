@@ -2,7 +2,7 @@ import axios, { type AxiosResponse } from 'axios';
 import type { ApiResponse } from '../types/api';
 
 const request = axios.create({
-  baseURL: '/api/v1/users', //
+  baseURL: '/api/v1', //
   timeout: 10000,
 });
 

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.function.Function;
+
 import jakarta.annotation.PostConstruct;
 
 @Component
@@ -26,6 +28,7 @@ public class JwtUtil {
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /**
      * 生成 Token

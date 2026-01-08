@@ -19,9 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 // 放行白名单
                 .excludePathPatterns(
-                        "/api/v1/users/login",              // 登录
-                        "/api/v1/users/register",           // 注册
-                        "/api/v1/users/send-register-code", // 发送验证码
+                        "/api/v1/auth/**",              // 登录
                         "/error",                           // Spring Boot 默认错误页
                         "/doc.html",                        // Swagger/Knife4j
                         "/webjars/**",

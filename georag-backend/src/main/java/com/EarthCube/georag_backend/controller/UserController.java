@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/api/v1")
 public class UserController {
 
     @Autowired
@@ -18,7 +18,7 @@ public class UserController {
     /**
      * 1. 发送注册验证码
      */
-    @PostMapping("/send-register-code")
+    @PostMapping("/auth/send-register-code")
     public Result<Void> sendRegisterCode(@RequestBody SendRegisterCodeDTO dto) {
         sysUserService.sendRegisterCode(dto);
         return Result.success("验证码已发送，有效期5分钟", null);
@@ -27,7 +27,7 @@ public class UserController {
     /**
      * 2. 用户注册
      */
-    @PostMapping("/register")
+    @PostMapping("/auth/register")
     public Result<ResponseVO> register(@RequestBody UserRegisterDTO dto) {
         ResponseVO vo = sysUserService.register(dto);
         return Result.success("注册成功", vo);
@@ -36,7 +36,7 @@ public class UserController {
     /**
      * 3. 用户登录
      */
-    @PostMapping("/login")
+    @PostMapping("/auth/login")
     public Result<UserLoginVO> login(@RequestBody UserLoginDTO dto) {
         UserLoginVO vo = sysUserService.login(dto);
         return Result.success("登录成功", vo);
@@ -46,7 +46,7 @@ public class UserController {
      * 4. 上传头像
      * 注意：Content-Type 是 multipart/form-data，不需要 @RequestBody
      */
-    @PostMapping("/avatar")
+    @PostMapping("/users/avatar")
     public Result<AvatarUploadVO> uploadAvatar(@RequestParam("file") MultipartFile file) {
         AvatarUploadVO vo = sysUserService.uploadAvatar(file);
         return Result.success("头像上传成功", vo);
@@ -55,7 +55,7 @@ public class UserController {
     /**
      * 5. 修改个人信息
      */
-    @PutMapping("/profile")
+    @PutMapping("/users/profile")
     public Result<Void> updateProfile(@RequestBody UpdateProfileDTO dto) {
         sysUserService.updateProfile(dto);
         return Result.success("个人信息修改成功", null);
@@ -64,7 +64,7 @@ public class UserController {
     /**
      * 6. 查看个人信息
      */
-    @GetMapping("/profile")
+    @GetMapping("/users/profile")
     public Result<UserProfileVO> getProfile() {
         UserProfileVO vo = sysUserService.getProfile();
         return Result.success("查询成功", vo);
@@ -73,7 +73,7 @@ public class UserController {
     /**
      * 7. 账号注销
      */
-    @PostMapping("/cancel")
+    @PostMapping("/users/cancel")
     public Result<Void> cancelAccount(@RequestBody CancelAccountDTO dto) {
         sysUserService.cancelAccount(dto);
         return Result.success("账号注销成功", null);
@@ -82,9 +82,17 @@ public class UserController {
     /**
      * 8. 查看剩余积分
      */
-    @GetMapping("/quota")
+    @GetMapping("/users/quota")
     public Result<QuotaVO> getQuota() {
         QuotaVO vo = sysUserService.getQuota();
         return Result.success("查询成功", vo);
+    }
+
+    /**
+     * test
+     */
+    @GetMapping("/auth/test")
+    public String getTest(){
+        return "fine!";
     }
 }

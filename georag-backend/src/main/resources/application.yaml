@@ -1,3 +1,6 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: GeoRAG
@@ -74,3 +77,8 @@ jwt:
 spring.servlet.multipart:
   max-file-size: 5MB
   max-request-size: 10MB
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG

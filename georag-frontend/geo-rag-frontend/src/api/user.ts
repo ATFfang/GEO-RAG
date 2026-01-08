@@ -55,7 +55,7 @@ export const userApi = {
    * 验证码有效期 5 分钟
    */
   sendRegisterCode(email: string): Promise<ApiResponse<null>> {
-    return request.post('/send-register-code', { email });
+    return request.post('/auth/send-register-code', { email });
   },
 
   /**
@@ -63,7 +63,7 @@ export const userApi = {
    * 验证验证码后直接返回登录 Token
    */
   register(data: RegisterParams): Promise<ApiResponse<{ id: string; token: string }>> {
-    return request.post('/register', data);
+    return request.post('/auth/register', data);
   },
 
   /**
@@ -71,7 +71,7 @@ export const userApi = {
    * 返回 JWT Token 及基础画像
    */
   login(data: LoginParams): Promise<ApiResponse<{ token: string; nickname: string; avatar: string }>> {
-    return request.post('/login', data);
+    return request.post('/auth/login', data);
   },
 
   /**
@@ -81,7 +81,7 @@ export const userApi = {
   uploadAvatar(file: File): Promise<ApiResponse<{ avatarUrl: string }>> {
     const formData = new FormData();
     formData.append('file', file);
-    return request.post('/avatar', formData, {
+    return request.post('/users/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
@@ -90,7 +90,7 @@ export const userApi = {
    * 5. 修改个人信息
    */
   updateProfile(data: ProfileUpdateParams): Promise<ApiResponse<null>> {
-    return request.put('/profile', data);
+    return request.put('/users/profile', data);
   },
 
   /**
@@ -98,7 +98,7 @@ export const userApi = {
    * 通过 Token 解析用户 ID
    */
   getProfile(): Promise<ApiResponse<UserInfo & { genderDesc: string; statusDesc: string; createTime: string }>> {
-    return request.get('/profile');
+    return request.get('/users/profile');
   },
 
   /**
@@ -106,13 +106,13 @@ export const userApi = {
    * 需要二次验证密码
    */
   cancelAccount(password: string): Promise<ApiResponse<null>> {
-    return request.post('/cancel', { password });
+    return request.post('/users/cancel', { password });
   },
 
   /**
    * 8. 查看剩余积分
    */
   getQuota(): Promise<ApiResponse<{ quota: number; quotaDesc: string }>> {
-    return request.get('/quota');
+    return request.get('/users/quota');
   }
 };
