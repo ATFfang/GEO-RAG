@@ -59,6 +59,8 @@ mybatis-plus:
       # 逻辑删除字段值 (0-未删除, 1-已删除) - 对应你的 status=3 业务逻辑可能需要适配
       logic-delete-value: 1
       logic-not-delete-value: 0
+  map-underscore-to-camel-case: true
+  jdbc-type-for-null: 'null'
 
 minio:
   endpoint: http://localhost:9000

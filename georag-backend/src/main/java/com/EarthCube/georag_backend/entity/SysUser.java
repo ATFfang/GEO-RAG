@@ -8,7 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.ibatis.type.JdbcType;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -24,6 +26,7 @@ import java.util.Map;
 @TableName(value = "sys_user", autoResultMap = true) // autoResultMap 必须为 true 才能让 JSON 处理器生效
 public class SysUser implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -86,8 +89,7 @@ public class SysUser implements Serializable {
      * 扩展字段 (JSON)
      * 存储前端偏好，如深色模式等
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
-    private Map<String, Object> settings;
+    private String settings;
 
     /**
      * 账号状态

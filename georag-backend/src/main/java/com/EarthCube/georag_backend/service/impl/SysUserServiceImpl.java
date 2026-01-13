@@ -2,6 +2,7 @@ package com.EarthCube.georag_backend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.core.util.StrUtil;
 import com.EarthCube.georag_backend.common.context.UserContext;
 import com.EarthCube.georag_backend.common.exception.BusinessException;
 import com.EarthCube.georag_backend.common.exception.ValidateException;
@@ -15,6 +16,8 @@ import com.EarthCube.georag_backend.service.SysUserService;
 import com.EarthCube.georag_backend.util.*;
 import com.EarthCube.georag_backend.vo.user.*;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -183,7 +188,21 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         // 2. 转换 VO
         UserProfileVO vo = new UserProfileVO();
-        BeanUtil.copyProperties(user, vo);
+        BeanUtil.copyProperties(user, vo, "settings");
+
+        String settingsStr = user.getSettings();
+        if (StrUtil.isNotBlank(settingsStr)) {
+            try {
+                // 直接新建一个 ObjectMapper 或从 Spring 容器注入
+                ObjectMapper objectMapper = new ObjectMapper();
+                Map<String, Object> map = objectMapper.readValue(settingsStr, new TypeReference<Map<String, Object>>() {});
+                vo.setSettings(map);
+            } catch (Exception e) {
+                vo.setSettings(new HashMap<>());
+            }
+        } else {
+            vo.setSettings(new HashMap<>());
+        }
 
         // 3. 处理枚举描述等
         vo.setGenderDesc(user.getGender() != null ? user.getGender().getDesc() : "未知");

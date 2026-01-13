@@ -94,7 +94,7 @@ const handleSubmit = async () => {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('userInfo', JSON.stringify(res.data));
         showToast('登录成功，正在跳转...', 'success');
-        setTimeout(() => router.push('/'), 1000);
+        setTimeout(() => router.push('/home'), 1000);
       }
     } else {
       const res = await userApi.register({
@@ -107,7 +107,7 @@ const handleSubmit = async () => {
       if(res.code === 200) {
         localStorage.setItem('token', res.data.token);
         showToast('注册成功', 'success');
-        setTimeout(() => router.push('/'), 1000);
+        setTimeout(() => router.push('/home'), 1000);
       }
     }
   } catch (error: any) {
