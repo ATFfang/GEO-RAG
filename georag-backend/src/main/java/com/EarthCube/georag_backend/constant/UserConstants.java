@@ -29,7 +29,7 @@ public class UserConstants {
 
     // ================== 业务默认值 ==================
     /** 默认头像 (MinIO 地址) */
-    public static final String DEFAULT_AVATAR = "http://localhost:9000/avatar/default.png";
+    public static final String DEFAULT_AVATAR = "http://localhost:9000/avatar/avatar/default.png";
 
     /** 注册赠送的默认积分 (M001DS定义中Quota自动生成) */
     public static final Integer DEFAULT_QUOTA = 10;
