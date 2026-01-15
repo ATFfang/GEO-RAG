@@ -31,7 +31,7 @@ public class ChatSession implements Serializable {
     /**
      * 对应用户的id字段 (必填)
      */
-    private Long userId;
+    private String userId;
 
     /**
      * Session名称 (必填)

@@ -1,16 +1,17 @@
 package com.EarthCube.georag_backend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.EarthCube.georag_backend.common.context.UserContext;
 import com.EarthCube.georag_backend.common.exception.BusinessException;
+import com.EarthCube.georag_backend.component.AiModelClient;
 import com.EarthCube.georag_backend.dto.chat.*;
 import com.EarthCube.georag_backend.entity.ChatMessage;
 import com.EarthCube.georag_backend.entity.ChatSession;
 import com.EarthCube.georag_backend.mapper.ChatMessageMapper;
 import com.EarthCube.georag_backend.mapper.ChatSessionMapper;
 import com.EarthCube.georag_backend.service.IChatService;
+import com.EarthCube.georag_backend.util.RedisUtil;
 import com.EarthCube.georag_backend.vo.chat.ChatMessageVO;
 import com.EarthCube.georag_backend.vo.chat.ChatSessionVO;
 import com.EarthCube.georag_backend.vo.chat.ChatStreamVO;
@@ -24,9 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -41,67 +40,53 @@ public class ChatServiceImpl implements IChatService {
     @Autowired
     private ChatMessageMapper chatMessageMapper;
 
-    // 假设你有一个 WebClient 或 OpenFeign 用于调用 Python 服务
-    // @Autowired
-    // private AiServiceClient aiServiceClient;
+    @Autowired
+    private RedisUtil redisUtil;
+
+    @Autowired
+    private AiModelClient aiModelClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 专门用于 SSE 推送的线程池，避免阻塞主线程
+    private static final int MAX_CONTEXT_COUNT = 20; // 只保留最近20轮对话
+    private static final long CONTEXT_TTL = 1800;    // 30分钟无操作清除缓存
+
+    // 专门用于 SSE 推送的线程池
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
-    /**
-     * 获取当前登录用户 ID (Long类型)
-     */
-    private Long getCurrentUserId() {
+    private String getCurrentUserId() {
         String userIdStr = UserContext.getUserId();
         if (StrUtil.isBlank(userIdStr)) {
             throw new BusinessException("用户未登录");
         }
-        return Long.parseLong(userIdStr);
+        return userIdStr;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String createSession(ChatSessionCreateDTO dto) {
-        Long userId = getCurrentUserId();
-
+        String userId = getCurrentUserId();
         ChatSession session = new ChatSession();
-        // 使用 UUID (注意: 实体类里如果是 @TableId(type=ASSIGN_UUID) 则不用手动 set)
-        // 但如果用 Hutool 手动控制也行
-        // session.setId(IdUtil.simpleUUID());
-
         session.setUserId(userId);
         session.setTitle(StrUtil.isBlank(dto.getTitle()) ? "新对话" : dto.getTitle());
         session.setMetaInfo(dto.getMetaInfo());
-        session.setStatus(1); // 正常
-
+        session.setStatus(1);
         chatSessionMapper.insert(session);
         return session.getId();
     }
 
     @Override
     public Page<ChatSessionVO> getSessionList(ChatSessionQueryDTO queryDTO) {
-        Long userId = getCurrentUserId();
-
+        String userId = getCurrentUserId();
         Page<ChatSession> page = new Page<>(queryDTO.getCurrent(), queryDTO.getSize());
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
-
-        // 【关键鉴权】只查当前用户的
         wrapper.eq(ChatSession::getUserId, userId);
         wrapper.eq(ChatSession::getStatus, 1);
-
-        // 搜索关键词
         if (StrUtil.isNotBlank(queryDTO.getKeyword())) {
             wrapper.like(ChatSession::getTitle, queryDTO.getKeyword());
         }
-
-        // 按更新时间倒序
         wrapper.orderByDesc(ChatSession::getUpdateTime);
-
         chatSessionMapper.selectPage(page, wrapper);
-
-        // 转换 VO
         Page<ChatSessionVO> resultPage = new Page<>();
         BeanUtil.copyProperties(page, resultPage, "records");
         List<ChatSessionVO> voList = page.getRecords().stream().map(session -> {
@@ -109,7 +94,6 @@ public class ChatServiceImpl implements IChatService {
             BeanUtil.copyProperties(session, vo);
             return vo;
         }).collect(Collectors.toList());
-
         resultPage.setRecords(voList);
         return resultPage;
     }
@@ -117,10 +101,7 @@ public class ChatServiceImpl implements IChatService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateSession(String sessionId, ChatSessionUpdateDTO dto) {
-        // 1. 校验归属权
         checkSessionOwner(sessionId);
-
-        // 2. 更新
         ChatSession update = new ChatSession();
         update.setId(sessionId);
         update.setTitle(dto.getTitle());
@@ -131,74 +112,69 @@ public class ChatServiceImpl implements IChatService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteSession(String sessionId) {
         checkSessionOwner(sessionId);
-
-        // 逻辑删除
         ChatSession update = new ChatSession();
         update.setId(sessionId);
-        update.setStatus(2); // 2-已删除
+        update.setStatus(2);
         chatSessionMapper.updateById(update);
     }
 
     @Override
     public List<ChatMessageVO> getSessionMessages(String sessionId, ChatMessageQueryDTO queryDTO) {
         checkSessionOwner(sessionId);
-
         LambdaQueryWrapper<ChatMessage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatMessage::getSessionId, sessionId);
-
-        // 游标分页逻辑 (create_time < cursor_msg_time OR id < cursor_id)
-        // 简化版：这里演示普通根据时间正序加载，或者根据 cursor 向前加载
-        // 实际高性能场景建议配合前端传最后一条消息的时间戳
         wrapper.orderByAsc(ChatMessage::getCreateTime);
         if (queryDTO.getLimit() != null) {
             wrapper.last("LIMIT " + queryDTO.getLimit());
         }
-
         List<ChatMessage> messages = chatMessageMapper.selectList(wrapper);
-
         return messages.stream().map(msg -> {
             ChatMessageVO vo = new ChatMessageVO();
             BeanUtil.copyProperties(msg, vo);
-            // JSONB 字段如果在 Entity 里已经是 List/Map，BeanUtil 会自动拷贝
             return vo;
         }).collect(Collectors.toList());
     }
 
     @Override
     public SseEmitter sendMsg(ChatSendDTO dto) {
-        Long userId = getCurrentUserId();
+        String userId = getCurrentUserId();
         String sessionId = dto.getSessionId();
 
-        // 1. 处理会话 (如果为空则新建)
+        // 1. 处理会话
         boolean isNewSession = false;
         if (StrUtil.isBlank(sessionId)) {
             ChatSessionCreateDTO createDTO = new ChatSessionCreateDTO();
-            createDTO.setTitle(StrUtil.sub(dto.getContent(), 0, 10)); // 默认取前10字做标题
+            createDTO.setTitle(StrUtil.sub(dto.getContent(), 0, 10));
             sessionId = createSession(createDTO);
             isNewSession = true;
         } else {
             checkSessionOwner(sessionId);
         }
 
-        // 2. 保存用户消息
+        // 2. 准备上下文 (Redis 优先策略)
+        List<Map<String, String>> historyContext = getContext(sessionId);
+
+        // 3. 落库用户消息
         ChatMessage userMsg = new ChatMessage();
         userMsg.setSessionId(sessionId);
         userMsg.setRole("user");
         userMsg.setContext(dto.getContent());
         userMsg.setPhoto(dto.getPhoto());
         userMsg.setFile(dto.getFile());
-        // 简单分类逻辑
         if (dto.getPhoto() != null && !dto.getPhoto().isEmpty()) userMsg.setCategory("text_photo");
         else if (dto.getFile() != null && !dto.getFile().isEmpty()) userMsg.setCategory("text_file");
         else userMsg.setCategory("text");
 
         chatMessageMapper.insert(userMsg);
 
-        // 3. 预保存 AI 回复 (占位)
+        // 将用户新消息同步写入 Redis 上下文
+        appendContext(sessionId, "user", dto.getContent());
+
+        // 4. 预保存 AI 回复 (占位)
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setSessionId(sessionId);
         aiMsg.setRole("assistant");
-        aiMsg.setContext(""); // 暂时为空
+        aiMsg.setContext("");
         aiMsg.setCategory("text");
         chatMessageMapper.insert(aiMsg);
 
@@ -206,72 +182,150 @@ public class ChatServiceImpl implements IChatService {
         String finalSessionId = sessionId;
         boolean finalIsNewSession = isNewSession;
 
-        // 4. 建立 SSE 连接
-        // timeout 设置为 0 表示永不超时 (实际建议设置 3-5 分钟)
+        // 5. 建立 SSE 连接
         SseEmitter emitter = new SseEmitter(0L);
 
-        // 5. 异步调用 Python AI 服务并推送流
+        // 6. 异步执行流式交互
         sseExecutor.execute(() -> {
             try {
-                // A. 发送首帧 (包含 sessionId, messageId)
+                // A. 发送首帧
                 if (finalIsNewSession) {
-                    emitter.send(ChatStreamVO.chunk(finalSessionId, aiMsgId, ""));
+                    sendSseChunk(emitter, finalSessionId, aiMsgId, "");
                 }
 
                 StringBuilder fullResponse = new StringBuilder();
 
-                // B. === 这里模拟 Python 服务的流式返回 ===
-                // 实际开发中，这里应使用 WebClient 请求 Python 接口
-                String mockAnswer = "这里是来自 AI 的模拟回复流式数据...";
-                for (char c : mockAnswer.toCharArray()) {
-                    // 模拟网络延迟
-                    Thread.sleep(100);
-                    // 推送 Chunk
-                    emitter.send(ChatStreamVO.chunk(finalSessionId, aiMsgId, String.valueOf(c)));
-                    fullResponse.append(c);
-                }
-                // ======================================
+                // B. 调用封装好的 Client
+                aiModelClient.streamChat(dto.getContent(), historyContext)
+                        .doOnNext(token -> {
+                            // --- 收到一个字：推给前端 ---
+                            sendSseChunk(emitter, finalSessionId, aiMsgId, token);
+                            fullResponse.append(token);
+                        })
+                        .doOnError(e -> {
+                            // --- 发生错误 ---
+                            log.error("AI 服务调用异常, SessionId: {}", finalSessionId, e);
+                            emitter.completeWithError(e);
+                        })
+                        .doOnComplete(() -> {
+                            // --- 流结束：收尾工作 ---
+                            String finalContent = fullResponse.toString();
 
-                // C. 推送结束帧
-                emitter.send(ChatStreamVO.end(finalSessionId, aiMsgId));
+                            // 1. 发送结束标志
+                            sendSseEnd(emitter, finalSessionId, aiMsgId);
 
-                // D. 异步更新数据库中的 AI 回复内容
-                ChatMessage updateMsg = new ChatMessage();
-                updateMsg.setId(aiMsgId);
-                updateMsg.setContext(fullResponse.toString());
-                chatMessageMapper.updateById(updateMsg);
+                            // 2. 更新 DB (完整回复)
+                            ChatMessage updateMsg = new ChatMessage();
+                            updateMsg.setId(aiMsgId);
+                            updateMsg.setContext(finalContent);
+                            chatMessageMapper.updateById(updateMsg);
 
-                // E. 结束 SSE
-                emitter.complete();
+                            // 3. 更新 Redis (追加上下文)
+                            appendContext(finalSessionId, "assistant", finalContent);
+
+                            // 4. 关闭连接
+                            emitter.complete();
+                        })
+                        .subscribe(); // 触发订阅
 
             } catch (Exception e) {
-                log.error("SSE 推送异常", e);
+                log.error("SSE 线程启动失败", e);
                 emitter.completeWithError(e);
-
-                // 也可以记录一条错误消息到数据库
             }
         });
 
         return emitter;
     }
 
-    /**
-     * 内部方法：校验会话归属权
-     */
     private void checkSessionOwner(String sessionId) {
-        Long userId = getCurrentUserId();
+        String userId = getCurrentUserId();
         ChatSession session = chatSessionMapper.selectById(sessionId);
 
         if (session == null) {
             throw new BusinessException("会话不存在");
         }
-        if (session.getStatus() == 2) { // 已删除
+        if (session.getStatus() == 2) {
             throw new BusinessException("会话已被删除");
         }
-        // 【核心安全校验】防止越权
         if (!session.getUserId().equals(userId)) {
             log.warn("越权访问警告: User {} 尝试访问 Session {}", userId, sessionId);
             throw new BusinessException("无权访问该会话");
         }
+    }
+
+    /**
+     * 发送 SSE 数据块
+     */
+    private void sendSseChunk(SseEmitter emitter, String sessionId, String msgId, String text) {
+        try {
+            emitter.send(ChatStreamVO.chunk(sessionId, msgId, text));
+        } catch (IOException e) {
+            log.warn("SSE 发送 Chunk 失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 发送 SSE 结束标志
+     */
+    private void sendSseEnd(SseEmitter emitter, String sessionId, String msgId) {
+        try {
+            emitter.send(ChatStreamVO.end(sessionId, msgId));
+        } catch (IOException e) {
+            log.warn("SSE 发送 End 失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 获取上下文 (Cache-Aside)
+     */
+    private List<Map<String, String>> getContext(String sessionId) {
+        String cacheKey = "chat:context:" + sessionId;
+
+        List<Object> cachedList = redisUtil.lGet(cacheKey, 0, -1);
+        List<Map<String, String>> context = new ArrayList<>();
+
+        if (cachedList != null && !cachedList.isEmpty()) {
+            for (Object obj : cachedList) {
+                if (obj instanceof Map) {
+                    context.add((Map<String, String>) obj);
+                }
+            }
+            redisUtil.expire(cacheKey, CONTEXT_TTL);
+            return context;
+        }
+
+        // Cache Miss: 从 DB 加载
+        log.info("Redis上下文缺失，从DB加载: {}", sessionId);
+        List<ChatMessage> dbMsgs = chatMessageMapper.selectList(
+                new LambdaQueryWrapper<ChatMessage>()
+                        .eq(ChatMessage::getSessionId, sessionId)
+                        .orderByDesc(ChatMessage::getCreateTime)
+                        .last("LIMIT " + MAX_CONTEXT_COUNT)
+        );
+
+        Collections.reverse(dbMsgs);
+
+        for (ChatMessage msg : dbMsgs) {
+            Map<String, String> item = new HashMap<>();
+            item.put("role", msg.getRole());
+            item.put("content", msg.getContext());
+            context.add(item);
+            redisUtil.lSet(cacheKey, item);
+        }
+
+        if (!context.isEmpty()) {
+            redisUtil.expire(cacheKey, CONTEXT_TTL);
+        }
+        return context;
+    }
+
+    private void appendContext(String sessionId, String role, String content) {
+        String cacheKey = "chat:context:" + sessionId;
+        Map<String, String> item = new HashMap<>();
+        item.put("role", role);
+        item.put("content", content);
+        redisUtil.lSet(cacheKey, item);
+        redisUtil.lTrim(cacheKey, MAX_CONTEXT_COUNT);
+        redisUtil.expire(cacheKey, CONTEXT_TTL);
     }
 }

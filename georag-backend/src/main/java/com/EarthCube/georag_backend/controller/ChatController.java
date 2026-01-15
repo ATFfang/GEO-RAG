@@ -9,6 +9,7 @@ import com.EarthCube.georag_backend.vo.chat.ChatSessionVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -51,11 +52,11 @@ public class ChatController {
     }
 
     /**
-     * 3. 发送消息并获取流式响应 (核心)
+     * 3. 发送消息并获取流式响应
      * POST /api/v1/chat/completions
      * 返回 text/event-stream 格式
      */
-    @PostMapping("/completions")
+    @PostMapping(value = "/completions", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter sendMsg(@RequestBody @Validated ChatSendDTO dto) {
         // SSE 接口直接返回 Emitter，不要用 Result 包装
         return chatService.sendMsg(dto);

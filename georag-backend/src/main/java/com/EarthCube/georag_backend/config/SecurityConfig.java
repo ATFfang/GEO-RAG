@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @EnableWebSecurity
@@ -29,6 +30,9 @@ public class SecurityConfig {
 
                 // 3. 核心：配置白名单 (URL 匹配规则)
                 .authorizeHttpRequests(auth -> auth
+                        // 允许所有的异步派发类型
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+
                         // ===============================================
                         // A. 🔓 这里的接口，所有人都能访问 (注册、登录、验证码)
                         // ===============================================
