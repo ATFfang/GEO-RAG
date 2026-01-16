@@ -5,6 +5,10 @@ import Profile from '../views/Profile.vue';
 
 const routes = [
   {
+    path: '/',
+    redirect: '/login' // 访问根路径时，自动跳到登录
+  },
+  {
     path: '/login',
     name: 'Login',
     component: Login
@@ -28,22 +32,22 @@ const router = createRouter({
   routes
 });
 
-// // 全局前置守卫
-// router.beforeEach((to, from, next) => {
-//   const token = localStorage.getItem('token');
+// 全局前置守卫
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token');
   
-//   if (to.meta.requiresAuth && !token) {
-//     // 强制跳转登录
-//     next('/login');
-//   } else if (to.path === '/login' && token) {
-//     // 已登录则跳过登录页
-//     next('/');
-//   } else {
-//     // 正常放行
-//     next();
-//   }
+  if (to.meta.requiresAuth && !token) {
+    // 强制跳转登录
+    next('/login');
+  } else if (to.path === '/login' && token) {
+    // 已登录则跳过登录页
+    next('/');
+  } else {
+    // 正常放行
+    next();
+  }
   
-//   // 测试阶段如果想关闭守卫，注释掉上面代码，直接使用: next();
-// });
+  // 测试阶段如果想关闭守卫，注释掉上面代码，直接使用: next();
+});
 
 export default router;

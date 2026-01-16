@@ -38,7 +38,7 @@ async def mock_ai_generator(query: str, history: List[Dict[str, str]]):
 
     # 模拟 4：流式输出 (每隔 0.1 秒吐一个字)
     for char in response_text:
-        yield char
+        yield f"data: {char}\n\n"
         # 控制流速，模拟真实打字机效果
         await asyncio.sleep(0.05)
 

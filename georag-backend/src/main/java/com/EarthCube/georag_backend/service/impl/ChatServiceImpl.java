@@ -198,6 +198,7 @@ public class ChatServiceImpl implements IChatService {
                 // B. 调用封装好的 Client
                 aiModelClient.streamChat(dto.getContent(), historyContext)
                         .doOnNext(token -> {
+//                            log.info("【探针】Java收到Python Token: {}", token);
                             // --- 收到一个字：推给前端 ---
                             sendSseChunk(emitter, finalSessionId, aiMsgId, token);
                             fullResponse.append(token);
